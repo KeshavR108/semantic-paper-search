@@ -1,0 +1,12 @@
+.venv/
+data/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+
+# Personal working files (kept local, not published)
+CLAUDE.md
+LEARNING.md
+INTERVIEW_NOTES.md
+learn/

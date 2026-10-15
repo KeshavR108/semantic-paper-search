@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hnsw"
+version = "0.1.0"
+description = "HNSW approximate nearest-neighbor search, from scratch"
+requires-python = ">=3.11"
+dependencies = ["numpy==2.1.3"]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.3", "hypothesis==6.115.0", "hnswlib==0.8.0"]  # hnswlib: reference in tests/bench only
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
