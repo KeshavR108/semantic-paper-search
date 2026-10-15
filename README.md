@@ -68,7 +68,20 @@ The main parameters:
 All numbers come from scripts in `bench/`, which write to `results/` along with the
 hardware, library versions, and commit they were run on.
 
-RESULTS_TABLE
+Recall against hnswlib, the standard C++ implementation, with the same data and settings (10,000 random 64-dimensional vectors, 200 held-out queries, M=16, ef_construction=200, single thread, Apple M4):
+
+| Metric | ef | Recall@10 (mine) | Recall@10 (hnswlib) | QPS (mine) | QPS (hnswlib) |
+|---|---|---|---|---|---|
+| l2 | 10 | 0.434 | 0.417 | 7,488 | 100,840 |
+| l2 | 50 | 0.850 | 0.843 | 2,532 | 31,638 |
+| l2 | 100 | 0.946 | 0.939 | 1,393 | 17,579 |
+| l2 | 200 | 0.988 | 0.983 | 772 | 9,749 |
+| cosine | 10 | 0.362 | 0.347 | 7,189 | 111,421 |
+| cosine | 50 | 0.766 | 0.746 | 2,436 | 31,185 |
+| cosine | 100 | 0.906 | 0.908 | 1,396 | 16,800 |
+| cosine | 200 | 0.983 | 0.984 | 781 | 9,375 |
+
+Recall matches the reference closely at every setting. Speed doesn't yet: hnswlib is compiled C++ and answers queries 12 to 15 times faster than my Python version. Closing that gap is what the C++ port is for.
 
 The test data here is random Gaussian vectors, which is close to a worst case for any
 nearest-neighbor index: in 64 dimensions, random points are all roughly the same distance
