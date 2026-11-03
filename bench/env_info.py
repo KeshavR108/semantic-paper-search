@@ -1,5 +1,3 @@
-"""Collect the run environment so every result file says where it came from."""
-
 import os
 import platform
 import subprocess

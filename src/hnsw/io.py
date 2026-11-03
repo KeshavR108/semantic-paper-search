@@ -1,12 +1,3 @@
-"""Save and load an HNSWIndex with np.savez (no pickle).
-
-The graph is a ragged list-of-lists-of-lists, which NumPy can't store directly,
-so it is flattened in a fixed order: node 0 layer 0, node 0 layer 1, ...,
-node 1 layer 0, ... For each (node, layer) slot we store its degree, and all
-neighbor ids are concatenated into one array. Since levels[n] tells us how many
-layers node n has, the degrees are enough to cut the array back apart.
-"""
-
 import json
 
 import numpy as np
@@ -28,8 +19,6 @@ def save(index: HNSWIndex, path) -> None:
         "neighbor_selection": index.neighbor_selection,
         "entry_point": index.entry_point,
         "max_level": index.max_level,
-        # Saving the RNG state means adding more vectors after load gives
-        # exactly the same graph as if the index had never been saved.
         "rng_state": index.rng.bit_generator.state,
     }
     np.savez(

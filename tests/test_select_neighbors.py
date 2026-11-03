@@ -1,19 +1,3 @@
-"""Neighbor selection on a hand-made 2D example (squared L2), base at the origin.
-
-            e2 (0, 3.2)
-            |
-    base ●──────● r (2, 0)  ● e1 (3, 0.3)
-
-Squared distance to base:  r: 4,  e1: 9.09,  e2: 10.24   (so sorted: r, e1, e2)
-
-- e1 is closer to r (1.09) than to base (9.09): reachable via base -> r -> e1,
-  so a direct link is redundant.
-- e2 is closer to base (10.24) than to r (14.24): a genuinely new direction.
-
-Simple selection (M=2) keeps the 2 nearest: r, e1 (both point right).
-The heuristic (M=2) keeps r, e2 (two directions).
-"""
-
 import numpy as np
 import pytest
 

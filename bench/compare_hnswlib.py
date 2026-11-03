@@ -1,13 +1,3 @@
-"""Compare this HNSW implementation against hnswlib with identical data and parameters.
-
-Both indexes are built single-threaded on the same vectors, then queried at several
-`ef` values. Recall is measured against exact brute-force results. Output is a JSON
-file in results/ that also records the hardware, library versions and git commit.
-
-Example:
-    python bench/compare_hnswlib.py --metric l2 --n 10000 --dim 64
-"""
-
 import argparse
 import json
 import time

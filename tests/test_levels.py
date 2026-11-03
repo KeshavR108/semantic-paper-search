@@ -11,9 +11,6 @@ def test_mL_is_one_over_ln_M():
 
 
 def test_level_distribution_matches_M_to_the_minus_L():
-    # P(level >= L) = M^-L. With n = 100k draws and M = 16:
-    #   level >= 1: expected 6250, std ~ 77  -> 10% tolerance is ~8 std
-    #   level >= 2: expected  391, std ~ 20  -> 25% tolerance is ~5 std
     idx = HNSWIndex(dim=4, M=16, seed=123)
     levels = np.array([idx.random_level() for _ in range(100_000)])
     assert levels.min() >= 0
@@ -24,7 +21,6 @@ def test_level_distribution_matches_M_to_the_minus_L():
 
 
 def test_random_level_never_takes_log_of_zero():
-    # rng.random() can return exactly 0.0; we use 1 - U, so ln sees 1.0 -> level 0.
     class ZeroRNG:
         def random(self):
             return 0.0

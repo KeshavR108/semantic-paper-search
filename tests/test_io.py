@@ -25,7 +25,6 @@ def test_save_load_round_trip(tmp_path, metric):
     np.testing.assert_array_equal(a_ids, b_ids)
     np.testing.assert_array_equal(a_d, b_d)
 
-    # The RNG state was saved too, so adding more vectors gives identical graphs.
     more = rng.standard_normal((100, 16)).astype(np.float32)
     idx.add_batch(more)
     loaded.add_batch(more)
