@@ -1,12 +1,15 @@
 # Semantic Paper Search
 
 A search engine for scientific papers that matches on meaning instead of keywords.
-Search for "how to make neural networks smaller" and it should find a paper called
-"Model Compression via Knowledge Distillation", even though the two barely share a word.
+Search for "heart attack risk in overweight people" and it returns "Body-mass index and
+mortality in Korean men and women" and "Obesity as a medical problem", papers that share
+almost no words with the query. Keyword search on the same query returns a paper about a
+heart disease questionnaire, because it matched "heart", "risk" and "people".
 
 I'm building the core pieces myself instead of calling a library for them: the vector
-index that makes search fast, and the embedding model that decides what "similar" means.
-The index is done. The model is what I'm working on now.
+index that makes search fast, the keyword baseline it's compared against, and the
+evaluation. The index and a first working version of the search are done. Fine-tuning the
+embedding model is what I'm working on now.
 
 ## How it works
 
@@ -29,9 +32,10 @@ implemented HNSW (Hierarchical Navigable Small World), the graph-based algorithm
 most vector databases. *(Done, in Python. C++ port in progress.)*
 
 **3. Evaluation.** For the index, I check recall: of the true nearest neighbors, how many
-did HNSW actually find, and how fast. For the full search system, I'll use SciFact, a
-benchmark where people have marked which papers are relevant to which questions, and compare
-my fine-tuned model against the original MiniLM and against BM25 keyword search.
+did HNSW actually find, and how fast. For the full search system, I use SciFact, a
+benchmark of 5,183 paper abstracts where people have marked which ones are relevant to each
+of 300 scientific claims. The baselines are BM25 keyword search (which I also wrote from
+scratch) and the original MiniLM; the fine-tuned model will be compared against both.
 
 ## The HNSW index
 
@@ -68,6 +72,39 @@ The main parameters:
 All numbers come from scripts in `bench/`, which write to `results/` along with the
 hardware, library versions, and commit they were run on.
 
+### Search quality on SciFact
+
+5,183 abstracts, 300 test queries, pretrained `all-MiniLM-L6-v2` (not fine-tuned yet),
+HNSW with M=16 and ef_construction=200, single thread, Apple M4:
+
+| System | nDCG@10 | MRR@10 | Recall@100 | Search time (p50) |
+|---|---|---|---|---|
+| BM25 keyword search | 0.664 | 0.632 | 0.886 | 0.31 ms |
+| MiniLM + exact search | 0.648 | 0.607 | 0.925 | 5.02 ms |
+| MiniLM + HNSW (ef=10) | 0.630 | 0.591 | n/a | 0.14 ms |
+| MiniLM + HNSW (ef=20) | 0.644 | 0.604 | n/a | 0.21 ms |
+| MiniLM + HNSW (ef=50) | 0.648 | 0.607 | n/a | 0.41 ms |
+| MiniLM + HNSW (ef=100) | 0.648 | 0.607 | 0.928 | 0.69 ms |
+
+Three things I took from this:
+
+- **Keyword search is a strong baseline.** BM25 beats the pretrained embedding model on
+  nDCG@10 (0.664 vs 0.648). SciFact queries are full of specific terms like gene and drug
+  names, which is where exact word matching does well. The embedding model finds more of
+  the relevant papers overall (recall@100 of 0.925 vs 0.886) but ranks them a little worse.
+  This is the gap fine-tuning is supposed to close.
+- **Approximate search costs nothing here once ef is 50 or more.** The HNSW rows use the same
+  embeddings as the exact row, so any difference is HNSW missing true neighbors. At ef=10 it
+  finds 92% of the true top 10 and nDCG drops by 0.018; at ef=50 it finds 99% and the
+  quality scores are identical to exact search.
+- **The index isn't the slow part.** Turning a query into a vector takes about 5 ms on CPU;
+  the HNSW lookup takes well under 1 ms. At this size (about 5,000 documents) exact search
+  would also be fast enough, so the index only starts to matter on larger collections.
+
+Recall@100 is n/a where ef is below 100, since the search can't return more results than ef.
+
+### Index recall against hnswlib
+
 Recall against hnswlib, the standard C++ implementation, with the same data and settings (10,000 random 64-dimensional vectors, 200 held-out queries, M=16, ef_construction=200, single thread, Apple M4):
 
 | Metric | ef | Recall@10 (mine) | Recall@10 (hnswlib) | QPS (mine) | QPS (hnswlib) |
@@ -93,9 +130,11 @@ real data (SIFT and GloVe vectors) are next.
 
 - [x] HNSW in Python and NumPy: insert, search, neighbor heuristic, save and load
 - [x] Test suite: graph invariants, exact match on small data, property-based tests, recall vs. hnswlib
+- [x] BM25 keyword search from scratch
+- [x] Semantic search on SciFact: BM25 and pretrained MiniLM baselines, exact vs. HNSW
+- [x] Retrieval metrics from scratch (nDCG, MRR, recall) and a command-line search demo
+- [ ] Fine-tuned embedding model, evaluated against both baselines
 - [ ] Benchmarks on SIFT-128 and GloVe-100 (recall vs. queries per second)
-- [ ] Semantic search over arXiv with BM25 and pretrained MiniLM as baselines
-- [ ] Fine-tuned embedding model, evaluated on SciFact
 - [ ] C++ version of the index with Python bindings (pybind11)
 
 ## Running it
@@ -122,9 +161,17 @@ index.add_batch(vectors)
 ids, distances = index.search(vectors[0], k=10, ef=100)
 ```
 
-Reproducing the comparison with hnswlib:
+Searching the papers (installs PyTorch and downloads SciFact, about 8 MB, on first run):
 
 ```bash
+.venv/bin/pip install -e ".[dev,search]"
+.venv/bin/python scripts/search_demo.py "heart attack risk in overweight people"
+```
+
+Reproducing the results:
+
+```bash
+.venv/bin/python bench/eval_scifact.py
 .venv/bin/python bench/compare_hnswlib.py --metric l2
 .venv/bin/python bench/compare_hnswlib.py --metric cosine
 ```
@@ -137,13 +184,20 @@ src/hnsw/
   brute_force.py   exact nearest neighbors, used as ground truth
   index.py         the HNSW index
   io.py            save and load an index
-tests/             unit tests, graph invariants, recall, save/load
+src/papersearch/
+  bm25.py          BM25 keyword search
+  metrics.py       nDCG, MRR, recall
+  embed.py         text to vectors (sentence-transformers)
+  data.py          SciFact loader
+scripts/           command-line search demo
+tests/             unit tests, graph invariants, recall, save/load, BM25, metrics
 bench/             benchmark scripts
 results/           benchmark output (JSON)
 ```
 
-The only runtime dependency is NumPy. hnswlib is used in tests and benchmarks as a
-reference, never in the implementation.
+The index itself depends only on NumPy. hnswlib is used in tests and benchmarks as a
+reference, never in the implementation. PyTorch and sentence-transformers are only needed
+for the embedding model.
 
 ## Reference
 
